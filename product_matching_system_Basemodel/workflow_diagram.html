@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Product Matching — System Workflow</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Caveat:wght@500;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+:root {
+  --bg:          #f4f6fb;
+  --bg2:         #eef1f8;
+  --surface:     #ffffff;
+  --border:      #dde3f0;
+  --border-soft: #eaecf4;
+  --text:        #1a1d2e;
+  --muted:       #8890b0;
+  --shadow:      rgba(60,70,120,0.10);
+  --shadow-lg:   rgba(60,70,120,0.18);
+
+  /* Vibrant node colours */
+  --violet:      #5b4cf5;
+  --violet-bg:   #edeaff;
+  --violet-bdr:  #b8b0fa;
+
+  --teal:        #0e9e8c;
+  --teal-bg:     #e0f7f4;
+  --teal-bdr:    #7dd6cc;
+
+  --orange:      #e8620a;
+  --orange-bg:   #fff0e6;
+  --orange-bdr:  #f5b98a;
+
+  --amber:       #c07f00;
+  --amber-bg:    #fff8e1;
+  --amber-bdr:   #f5d07a;
+
+  --rose:        #d42a6a;
+  --rose-bg:     #fde8f1;
+  --rose-bdr:    #f4a8c8;
+
+  --blue:        #1a6ef5;
+  --blue-bg:     #e8f0ff;
+  --blue-bdr:    #90b8fa;
+
+  --grid:        rgba(100,110,200,0.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  font-family: 'Outfit', sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: auto;
+}
+
+/* Subtle dot grid */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image: radial-gradient(circle, rgba(100,110,200,0.15) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1.5px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 28px;
+  box-shadow: 0 2px 16px var(--shadow);
+}
+
+.toolbar-logo {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--violet), var(--blue));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(91,76,245,0.35);
+}
+
+.toolbar-title {
+  font-size: 16px; font-weight: 700;
+  color: var(--text); letter-spacing: -0.3px;
+}
+.toolbar-title span { color: var(--violet); }
+
+.toolbar-sep { width: 1px; height: 22px; background: var(--border); }
+
+.chip {
+  background: var(--bg2); border: 1.5px solid var(--border);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 11.5px; font-weight: 500; color: var(--muted);
+  font-family: 'Fira Code', monospace;
+}
+.chip b { color: var(--violet); font-weight: 600; }
+
+.toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+.hint {
+  font-size: 11.5px; color: var(--muted);
+  background: var(--bg2); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 5px 12px;
+}
+.hint span { color: var(--orange); font-weight: 600; }
+
+.btn {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 6px 16px;
+  font-size: 12px; font-weight: 600; color: var(--text);
+  cursor: pointer; font-family: 'Outfit', sans-serif;
+  transition: all 0.15s;
+}
+.btn:hover { border-color: var(--violet); color: var(--violet); background: var(--violet-bg); }
+.btn-primary {
+  background: var(--violet); border-color: var(--violet);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(91,76,245,0.3);
+}
+.btn-primary:hover { background: #4a3bde; border-color: #4a3bde; color: #fff; }
+
+/* ── Canvas ── */
+.canvas-scroll { padding: 80px 40px 80px; overflow-x: auto; }
+.canvas-wrap {
+  position: relative;
+  width: 1820px; height: 1080px;
+  margin: 0 auto;
+}
+
+/* ── Section banners ── */
+.section-banner {
+  position: absolute;
+  top: 0; border-radius: 12px;
+  padding: 7px 18px;
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.6px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 7px;
+}
+
+/* ── Nodes ── */
+.node {
+  position: absolute;
+  border-radius: 16px;
+  border: 2px solid;
+  padding: 16px 18px;
+  cursor: pointer;
+  background: var(--surface);
+  box-shadow: 0 3px 14px var(--shadow);
+  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.18s ease;
+  user-select: none;
+  animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.node:hover {
+  transform: translateY(-5px) scale(1.025);
+  box-shadow: 0 10px 32px var(--shadow-lg);
+  z-index: 50;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.88) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.node-icon {
+  width: 32px; height: 32px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; margin-bottom: 10px;
+  flex-shrink: 0;
+}
+.node-title {
+  font-size: 12.5px; font-weight: 700; margin-bottom: 3px;
+  font-family: 'Fira Code', monospace;
+  letter-spacing: -0.3px;
+}
+.node-subtitle {
+  font-size: 11.5px; color: var(--muted);
+  line-height: 1.55; font-family: 'Outfit', sans-serif;
+}
+.node-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 10px; border-radius: 20px;
+  padding: 3px 10px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.6px; text-transform: uppercase;
+}
+
+/* ── Node colour themes ── */
+.n-violet { border-color: var(--violet-bdr); background: linear-gradient(145deg, #fff, var(--violet-bg)); }
+.n-violet .node-title { color: var(--violet); }
+.n-violet .node-icon  { background: var(--violet-bg); color: var(--violet); }
+.n-violet .node-tag   { background: var(--violet-bg); color: var(--violet); border: 1.5px solid var(--violet-bdr); }
+.n-violet:hover { box-shadow: 0 10px 32px rgba(91,76,245,0.2); }
+
+.n-teal { border-color: var(--teal-bdr); background: linear-gradient(145deg, #fff, var(--teal-bg)); }
+.n-teal .node-title { color: var(--teal); }
+.n-teal .node-icon  { background: var(--teal-bg); color: var(--teal); }
+.n-teal .node-tag   { background: var(--teal-bg); color: var(--teal); border: 1.5px solid var(--teal-bdr); }
+.n-teal:hover { box-shadow: 0 10px 32px rgba(14,158,140,0.2); }
+
+.n-orange { border-color: var(--orange-bdr); background: linear-gradient(145deg, #fff, var(--orange-bg)); }
+.n-orange .node-title { color: var(--orange); }
+.n-orange .node-icon  { background: var(--orange-bg); color: var(--orange); }
+.n-orange .node-tag   { background: var(--orange-bg); color: var(--orange); border: 1.5px solid var(--orange-bdr); }
+.n-orange:hover { box-shadow: 0 10px 32px rgba(232,98,10,0.18); }
+
+/* Pulse glow for AI nodes */
+@keyframes aiGlow {
+  0%,100% { box-shadow: 0 3px 14px var(--shadow); }
+  50%      { box-shadow: 0 6px 28px rgba(232,98,10,0.28), 0 0 0 5px rgba(232,98,10,0.07); }
+}
+.n-orange { animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both, aiGlow 3.5s ease-in-out infinite; }
+
+.n-amber { border-color: var(--amber-bdr); border-style: dashed; background: linear-gradient(145deg, #fff, var(--amber-bg)); }
+.n-amber .node-title { color: var(--amber); }
+.n-amber .node-icon  { background: var(--amber-bg); color: var(--amber); }
+.n-amber .node-tag   { background: var(--amber-bg); color: var(--amber); border: 1.5px dashed var(--amber-bdr); }
+.n-amber:hover { box-shadow: 0 10px 32px rgba(192,127,0,0.18); }
+
+.n-rose { border-color: var(--rose-bdr); background: linear-gradient(145deg, #fff, var(--rose-bg)); }
+.n-rose .node-title { color: var(--rose); }
+.n-rose .node-icon  { background: var(--rose-bg); color: var(--rose); }
+.n-rose .node-tag   { background: var(--rose-bg); color: var(--rose); border: 1.5px solid var(--rose-bdr); }
+.n-rose:hover { box-shadow: 0 10px 32px rgba(212,42,106,0.18); }
+
+.n-blue { border-color: var(--blue-bdr); background: linear-gradient(145deg, #fff, var(--blue-bg)); }
+.n-blue .node-title { color: var(--blue); }
+.n-blue .node-icon  { background: var(--blue-bg); color: var(--blue); }
+.n-blue .node-tag   { background: var(--blue-bg); color: var(--blue); border: 1.5px solid var(--blue-bdr); }
+.n-blue:hover { box-shadow: 0 10px 32px rgba(26,110,245,0.18); }
+
+/* ── SVG arrows layer ── */
+#arrows {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; overflow: visible;
+}
+
+/* ── Side panel ── */
+.panel {
+  position: fixed; right: -400px; top: 64px;
+  width: 380px; height: calc(100vh - 64px);
+  background: #fff;
+  border-left: 1.5px solid var(--border);
+  box-shadow: -8px 0 40px var(--shadow);
+  z-index: 200; padding: 28px 24px 40px;
+  transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
+  overflow-y: auto;
+}
+.panel.open { right: 0; }
+
+.panel-close {
+  position: absolute; top: 18px; right: 18px;
+  width: 30px; height: 30px; border-radius: 8px;
+  background: var(--bg2); border: 1.5px solid var(--border);
+  cursor: pointer; font-size: 14px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.panel-close:hover { background: var(--rose-bg); border-color: var(--rose-bdr); color: var(--rose); }
+
+.panel-icon-row {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.panel-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.panel-title {
+  font-size: 20px; font-weight: 800; color: var(--text);
+  letter-spacing: -0.4px; line-height: 1.2;
+  font-family: 'Outfit', sans-serif;
+}
+.panel-type {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); margin-bottom: 14px;
+}
+.panel-desc {
+  font-size: 13.5px; line-height: 1.75; color: #4a4e68;
+  margin-bottom: 20px; font-family: 'Caveat', cursive;
+  font-size: 16px;
+}
+.panel-sec-title {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted);
+  margin-bottom: 8px; padding-bottom: 5px;
+  border-bottom: 1.5px solid var(--border-soft);
+}
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.pill {
+  border-radius: 20px; padding: 4px 11px; font-size: 11px;
+  font-weight: 500; background: var(--bg2); color: var(--text);
+  border: 1.5px solid var(--border);
+}
+
+.code-box {
+  background: #f8f9ff; border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 18px;
+  font-family: 'Fira Code', monospace; font-size: 11.5px;
+  line-height: 1.75; overflow-x: auto;
+}
+.code-box .kw  { color: var(--violet); font-weight: 600; }
+.code-box .fn  { color: var(--orange); font-weight: 500; }
+.code-box .str { color: var(--teal); }
+.code-box .cm  { color: #a0aabb; font-style: italic; }
+.code-box .num { color: var(--rose); }
+
+/* ── Legend ── */
+.legend {
+  position: fixed; bottom: 24px; left: 24px; z-index: 100;
+  background: rgba(255,255,255,0.94); border: 1.5px solid var(--border);
+  backdrop-filter: blur(12px); border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 20px var(--shadow);
+}
+.legend-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); margin-bottom: 10px;
+}
+.legend-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text); margin-bottom: 6px;
+  font-weight: 500;
+}
+.ldot {
+  width: 14px; height: 14px; border-radius: 4px; border: 2px solid;
+  flex-shrink: 0;
+}
+
+/* ── Section label ── */
+.sec-label {
+  position: absolute;
+  font-family: 'Caveat', cursive;
+  font-size: 19px; font-weight: 700;
+  padding: 6px 16px; border-radius: 10px;
+  border: 2px solid;
+}
+</style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="toolbar-logo">🔍</div>
+  <div class="toolbar-title">AI Product Matching <span>System</span></div>
+  <div class="toolbar-sep"></div>
+  <div class="chip"><b>utils/</b>matcher.py</div>
+  <div class="chip"><b>app/</b>streamlit_app.py</div>
+  <div class="chip">Base Model <b>v1.0</b></div>
+  <div class="toolbar-right">
+    <div class="hint">👆 Click any node to see <span>code + details</span></div>
+    <button class="btn" onclick="closePanel()">✕ Close Panel</button>
+    <button class="btn btn-primary" onclick="drawAllArrows()">⟳ Refresh</button>
+  </div>
+</div>
+
+<!-- Side Panel -->
+<div class="panel" id="panel">
+  <div class="panel-close" onclick="closePanel()">✕</div>
+  <div id="panel-body"></div>
+</div>
+
+<!-- Canvas -->
+<div class="canvas-scroll">
+<div class="canvas-wrap" id="canvas">
+
+  <svg id="arrows" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="ah-violet" markerWidth="9" markerHeight="7" refX="7" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#b8b0fa"/>
+      </marker>
+      <marker id="ah-teal" markerWidth="9" markerHeight="7" refX="7" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#7dd6cc"/>
+      </marker>
+      <marker id="ah-orange" markerWidth="9" markerHeight="7" refX="7" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#f5b98a"/>
+      </marker>
+      <marker id="ah-amber" markerWidth="9" markerHeight="7" refX="7" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#f5d07a"/>
+      </marker>
+      <marker id="ah-rose" markerWidth="9" markerHeight="7" refX="7" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#f4a8c8"/>
+      </marker>
+      <marker id="ah-blue" markerWidth="9" markerHeight="7" refX="7" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#90b8fa"/>
+      </marker>
+    </defs>
+  </svg>
+
+  <!-- ═══════════ SECTION LABELS ═══════════ -->
+  <div class="sec-label" style="left:20px;top:12px;color:var(--violet);border-color:var(--violet-bdr);background:var(--violet-bg)">① Input</div>
+  <div class="sec-label" style="left:330px;top:12px;color:var(--teal);border-color:var(--teal-bdr);background:var(--teal-bg)">② Data Pipeline</div>
+  <div class="sec-label" style="left:720px;top:12px;color:var(--orange);border-color:var(--orange-bdr);background:var(--orange-bg)">③ AI Core</div>
+  <div class="sec-label" style="left:1180px;top:12px;color:var(--amber);border-color:var(--amber-bdr);background:var(--amber-bg)">④ Logic</div>
+  <div class="sec-label" style="left:1490px;top:12px;color:var(--rose);border-color:var(--rose-bdr);background:var(--rose-bg)">⑤ Output</div>
+
+  <!-- ═══════════ COLUMN 1 — INPUTS ═══════════ -->
+
+  <!-- Single Search -->
+  <div class="node n-violet" id="n-single" style="left:22px;top:80px;width:210px;animation-delay:0.05s" onclick="showPanel('single')">
+    <div class="node-icon">🔍</div>
+    <div class="node-title">Single Search</div>
+    <div class="node-subtitle">URL or title input<br>Threshold slider · Tab 1</div>
+    <div class="node-tag">UI · Input</div>
+  </div>
+
+  <!-- Batch Upload -->
+  <div class="node n-violet" id="n-batch" style="left:22px;top:270px;width:210px;animation-delay:0.10s" onclick="showPanel('batch')">
+    <div class="node-icon">📂</div>
+    <div class="node-title">Batch Upload</div>
+    <div class="node-subtitle">Excel / CSV upload<br>Smart column mapping</div>
+    <div class="node-tag">UI · Tab 2</div>
+  </div>
+
+  <!-- Excel Dataset -->
+  <div class="node n-blue" id="n-excel" style="left:22px;top:470px;width:210px;animation-delay:0.15s" onclick="showPanel('excel')">
+    <div class="node-icon">📊</div>
+    <div class="node-title">Excel Dataset</div>
+    <div class="node-subtitle">Example 1 & 2<br>Ground truth annotations</div>
+    <div class="node-tag">data/ · Source</div>
+  </div>
+
+  <!-- Notebook -->
+  <div class="node n-blue" id="n-notebook" style="left:22px;top:660px;width:210px;animation-delay:0.18s" onclick="showPanel('notebook')">
+    <div class="node-icon">📓</div>
+    <div class="node-title">experiments.ipynb</div>
+    <div class="node-subtitle">10 test sections<br>Accuracy + AHT bench</div>
+    <div class="node-tag">Backend Tests</div>
+  </div>
+
+  <!-- ═══════════ COLUMN 2 — DATA PIPELINE ═══════════ -->
+
+  <!-- extract_title_from_url -->
+  <div class="node n-teal" id="n-scraper" style="left:310px;top:80px;width:220px;animation-delay:0.20s" onclick="showPanel('scraper')">
+    <div class="node-icon">🌐</div>
+    <div class="node-title">extract_title_from_url()</div>
+    <div class="node-subtitle">og:title → CSS → &lt;title&gt;<br>Geo-block bypass headers</div>
+    <div class="node-tag">Web Scraper</div>
+  </div>
+
+  <!-- resolve_target_domain -->
+  <div class="node n-teal" id="n-domain" style="left:310px;top:270px;width:220px;animation-delay:0.23s" onclick="showPanel('domain')">
+    <div class="node-icon">🎯</div>
+    <div class="node-title">resolve_target_domain()</div>
+    <div class="node-subtitle">TY → trendyol.com<br>NN_KSA → noon.com</div>
+    <div class="node-tag">Domain Map</div>
+  </div>
+
+  <!-- load_data -->
+  <div class="node n-teal" id="n-loaddata" style="left:310px;top:460px;width:220px;animation-delay:0.26s" onclick="showPanel('loaddata')">
+    <div class="node-icon">📥</div>
+    <div class="node-title">load_data()</div>
+    <div class="node-subtitle">Read Excel · enrich titles<br>url_slug + clean_title</div>
+    <div class="node-tag">Data Loading</div>
+  </div>
+
+  <!-- clean_text -->
+  <div class="node n-teal" id="n-clean" style="left:310px;top:650px;width:220px;animation-delay:0.29s" onclick="showPanel('clean')">
+    <div class="node-icon">✨</div>
+    <div class="node-title">clean_text()</div>
+    <div class="node-subtitle">Arabic + Latin safe<br>256gb → 256 gb</div>
+    <div class="node-tag">Text Normalize</div>
+  </div>
+
+  <!-- ═══════════ COLUMN 3 — AI CORE ═══════════ -->
+
+  <!-- compare_two_products -->
+  <div class="node n-orange" id="n-compare" style="left:620px;top:80px;width:235px;animation-delay:0.32s" onclick="showPanel('compare')">
+    <div class="node-icon">⚡</div>
+    <div class="node-title">compare_two_products()</div>
+    <div class="node-subtitle">Direct URL-to-URL score<br>Cosine similarity instant</div>
+    <div class="node-tag">Direct Compare</div>
+  </div>
+
+  <!-- load_model -->
+  <div class="node n-orange" id="n-model" style="left:620px;top:280px;width:235px;animation-delay:0.36s" onclick="showPanel('model')">
+    <div class="node-icon">🤖</div>
+    <div class="node-title">load_model()</div>
+    <div class="node-subtitle">paraphrase-multilingual<br>MiniLM-L12-v2 · 384 dims<br>Arabic + English + Turkish</div>
+    <div class="node-tag">🤗 SentenceTransformer</div>
+  </div>
+
+  <!-- build_index -->
+  <div class="node n-orange" id="n-index" style="left:620px;top:510px;width:235px;animation-delay:0.40s" onclick="showPanel('index')">
+    <div class="node-icon">🗂</div>
+    <div class="node-title">build_index()</div>
+    <div class="node-subtitle">FAISS IndexFlatIP<br>L2-normalised cosine search<br>800+ product vectors</div>
+    <div class="node-tag">FAISS · Vector DB</div>
+  </div>
+
+  <!-- find_match -->
+  <div class="node n-orange" id="n-findmatch" style="left:620px;top:710px;width:235px;animation-delay:0.44s" onclick="showPanel('findmatch')">
+    <div class="node-icon">🔬</div>
+    <div class="node-title">find_match()</div>
+    <div class="node-subtitle">3-Signal engine · FAISS search<br>Domain filter · Top-5 results</div>
+    <div class="node-tag">Core Engine</div>
+  </div>
+
+  <!-- ═══════════ COLUMN 4 — LOGIC ═══════════ -->
+
+  <!-- 3-Signal Scoring -->
+  <div class="node n-amber" id="n-scoring" style="left:1050px;top:80px;width:240px;animation-delay:0.48s" onclick="showPanel('scoring')">
+    <div class="node-icon">📐</div>
+    <div class="node-title">3-Signal Scoring</div>
+    <div class="node-subtitle">
+      Semantic × 0.60<br>
+      Keyword overlap × 0.20<br>
+      Model# boost ≤ 0.20
+    </div>
+    <div class="node-tag">Scoring Formula</div>
+  </div>
+
+  <!-- Threshold Check -->
+  <div class="node n-amber" id="n-threshold" style="left:1050px;top:320px;width:240px;animation-delay:0.51s" onclick="showPanel('threshold')">
+    <div class="node-icon">⚖️</div>
+    <div class="node-title">Threshold Check</div>
+    <div class="node-subtitle">
+      score ≥ 0.75 → Match Found<br>
+      score &lt; 0.75 → No Match<br>
+      Adjustable via slider
+    </div>
+    <div class="node-tag">Decision Gate</div>
+  </div>
+
+  <!-- run_batch -->
+  <div class="node n-teal" id="n-runbatch" style="left:1050px;top:570px;width:240px;animation-delay:0.54s" onclick="showPanel('runbatch')">
+    <div class="node-icon">⚙️</div>
+    <div class="node-title">run_batch()</div>
+    <div class="node-subtitle">Row-by-row processing<br>Progress callback<br>Self-match exclusion</div>
+    <div class="node-tag">Batch Processor</div>
+  </div>
+
+  <!-- extract_model_numbers -->
+  <div class="node n-amber" id="n-modelnums" style="left:1050px;top:790px;width:240px;animation-delay:0.56s" onclick="showPanel('modelnums')">
+    <div class="node-icon">🔢</div>
+    <div class="node-title">extract_model_numbers()</div>
+    <div class="node-subtitle">2S9L1AA · NFK37211<br>256GB · 330LT · 15W<br>High-value exact signals</div>
+    <div class="node-tag">Signal 3 Helper</div>
+  </div>
+
+  <!-- ═══════════ COLUMN 5 — OUTPUT ═══════════ -->
+
+  <!-- AHT Dashboard -->
+  <div class="node n-rose" id="n-aht" style="left:1480px;top:80px;width:215px;animation-delay:0.58s" onclick="showPanel('aht')">
+    <div class="node-icon">📈</div>
+    <div class="node-title">AHT Dashboard</div>
+    <div class="node-subtitle">Session timing tracker<br>AHT reduction calculator<br>Line chart · Tab 3</div>
+    <div class="node-tag">Analytics UI</div>
+  </div>
+
+  <!-- save_result -->
+  <div class="node n-rose" id="n-save" style="left:1480px;top:310px;width:215px;animation-delay:0.61s" onclick="showPanel('save')">
+    <div class="node-icon">💾</div>
+    <div class="node-title">save_result_with_aht()</div>
+    <div class="node-subtitle">Append to persistent log<br>Clickable hyperlinks</div>
+    <div class="node-tag">Excel Log</div>
+  </div>
+
+  <!-- generate_batch_excel -->
+  <div class="node n-rose" id="n-batchxl" style="left:1480px;top:510px;width:215px;animation-delay:0.64s" onclick="showPanel('batchxl')">
+    <div class="node-icon">📤</div>
+    <div class="node-title">generate_batch_excel()</div>
+    <div class="node-subtitle">Download on-demand<br>2-sheet workbook</div>
+    <div class="node-tag">Batch Export</div>
+  </div>
+
+  <!-- Project Structure -->
+  <div class="node n-blue" id="n-structure" style="left:1480px;top:710px;width:215px;animation-delay:0.67s" onclick="showPanel('structure')">
+    <div class="node-icon">🗂</div>
+    <div class="node-title">Project Structure</div>
+    <div class="node-subtitle">app/ · utils/ · data/<br>.env · requirements.txt</div>
+    <div class="node-tag">File System</div>
+  </div>
+
+</div><!-- canvas-wrap -->
+</div><!-- canvas-scroll -->
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-title">Node Types</div>
+  <div class="legend-row"><div class="ldot" style="border-color:var(--violet-bdr);background:var(--violet-bg)"></div>Input / UI</div>
+  <div class="legend-row"><div class="ldot" style="border-color:var(--teal-bdr);background:var(--teal-bg)"></div>Data Process</div>
+  <div class="legend-row"><div class="ldot" style="border-color:var(--orange-bdr);background:var(--orange-bg)"></div>AI / Model</div>
+  <div class="legend-row"><div class="ldot" style="border-color:var(--amber-bdr);background:var(--amber-bg);border-style:dashed"></div>Logic / Decision</div>
+  <div class="legend-row"><div class="ldot" style="border-color:var(--rose-bdr);background:var(--rose-bg)"></div>Output</div>
+  <div class="legend-row"><div class="ldot" style="border-color:var(--blue-bdr);background:var(--blue-bg)"></div>Files / Storage</div>
+</div>
+
+<script>
+// ── Panel data ────────────────────────────────────────────────────────────────
+const DATA = {
+  single: {
+    icon:'🔍', color:'var(--violet)', bg:'var(--violet-bg)',
+    title:'Single Search', type:'UI Input · Tab 1 · streamlit_app.py',
+    desc:'User pastes a source product URL or types a product title in any language. Optionally filters results to a specific target website. Auto-extracts titles from URLs using the scraper.',
+    inputs:['Source URL (optional)','Product Title (any language)','Target Website / URL / Retailer Code','Match Threshold (0.5–1.0 slider)'],
+    code:`<span class="cm"># Tab 1 flow — streamlit_app.py</span>
+source_url    = st.<span class="fn">text_input</span>(<span class="str">"source_url_input"</span>)
+product_title = st.<span class="fn">text_input</span>(<span class="str">"product_title_input"</span>)
+target_site   = st.<span class="fn">text_input</span>(<span class="str">"target_site_input"</span>)
+threshold     = st.<span class="fn">slider</span>(<span class="num">0.5</span>, <span class="num">1.0</span>, value=<span class="num">0.75</span>)`,
+    outputs:['Extracted title from URL','Top 5 match results table','AHT per search (seconds)']
+  },
+  batch: {
+    icon:'📂', color:'var(--violet)', bg:'var(--violet-bg)',
+    title:'Batch Upload', type:'UI Input · Tab 2 · streamlit_app.py',
+    desc:'Upload an Excel or CSV file with hundreds of products at once. Smart column mapping auto-detects title, URL, and target site columns. Supports retailer codes (TY, NN_KSA) per row.',
+    inputs:['Excel (.xlsx) or CSV file','Column mapping UI (auto-detected)','Global target website (optional)','Threshold slider'],
+    code:`<span class="cm"># Column auto-detection</span>
+<span class="kw">def</span> <span class="fn">best_guess</span>(keywords):
+    <span class="kw">for</span> kw <span class="kw">in</span> keywords:
+        <span class="kw">for</span> col <span class="kw">in</span> raw_df.columns:
+            <span class="kw">if</span> kw <span class="kw">in</span> col: <span class="kw">return</span> col
+    <span class="kw">return</span> <span class="str">"— None —"</span>`,
+    outputs:['Batch results DataFrame','Progress bar + status','Summary metrics (match rate, AHT)','Excel download button']
+  },
+  excel: {
+    icon:'📊', color:'var(--blue)', bg:'var(--blue-bg)',
+    title:'Excel Dataset', type:'Data Source · data/ folder',
+    desc:'The reference product catalog loaded at startup. Contains crawled product titles, manually verified target links, and human-annotated ground truth from the annotation team.',
+    inputs:['crawling title — product name','Link — target product URL','Unnamed: 8 — ground truth fallback link'],
+    code:`<span class="cm"># Located in data/ folder:</span>
+Matching List - Example 1 (1).xlsx
+Matching List - Example 2 (1).xlsx
+
+<span class="cm"># Key columns used:</span>
+<span class="str">"crawling title"</span>  <span class="cm">→ product name to index</span>
+<span class="str">"Link"</span>           <span class="cm">→ verified target URL</span>
+<span class="str">"Unnamed: 8"</span>     <span class="cm">→ GT annotation fallback</span>`,
+    outputs:['DataFrame with 800+ products','Enriched: url_slug, enriched_title, clean_title']
+  },
+  notebook: {
+    icon:'📓', color:'var(--blue)', bg:'var(--blue-bg)',
+    title:'experiments.ipynb', type:'Backend Testing · Project Root',
+    desc:'10-section notebook that tests the entire pipeline before running the Streamlit app. Run this first to check accuracy against ground truth and benchmark AHT reduction numbers.',
+    inputs:['Section 0: Setup + HF token fix','Section 1–2: Data + text cleaning','Section 3–4: Model + FAISS index','Section 5–7: Match + domain filter','Section 9: Accuracy evaluation','Section 10: AHT benchmarking'],
+    code:`<span class="cm"># Recommended order every time:</span>
+<span class="num">1.</span> python utils/matcher.py   <span class="cm">← terminal</span>
+<span class="num">2.</span> jupyter notebook          <span class="cm">← deep test</span>
+<span class="num">3.</span> streamlit run app/streamlit_app.py
+
+<span class="cm"># Section 9 → accuracy %</span>
+<span class="cm"># Section 10 → AHT reduction %</span>`,
+    outputs:['Accuracy % vs ground truth','AHT benchmark results','test_batch_output.xlsx']
+  },
+  scraper: {
+    icon:'🌐', color:'var(--teal)', bg:'var(--teal-bg)',
+    title:'extract_title_from_url()', type:'Web Scraping · matcher.py',
+    desc:'Scrapes any e-commerce product page URL and extracts the product title. Uses browser-mimicking headers to bypass geo-restrictions on Saudi and Turkish sites. Three-level fallback chain.',
+    inputs:['URL string (must start with http/https)'],
+    code:`<span class="cm"># 3-level fallback chain:</span>
+<span class="num">1.</span> og:title meta tag     <span class="cm">← most reliable</span>
+<span class="num">2.</span> Site CSS selector    <span class="cm">← noon, jarir, amazon</span>
+<span class="num">3.</span> &lt;title&gt; tag strip    <span class="cm">← remove "| SiteName"</span>
+
+<span class="cm"># Geo-block bypass:</span>
+User-Agent: <span class="str">Chrome/124</span>
+Accept-Language: <span class="str">ar,en;q=0.9,tr;q=0.8</span>`,
+    outputs:['{ title, source, success, error }']
+  },
+  domain: {
+    icon:'🎯', color:'var(--teal)', bg:'var(--teal-bg)',
+    title:'resolve_target_domain()', type:'Domain Resolver · matcher.py',
+    desc:'Converts any target format — retailer shortcode, full URL, or plain domain — into a bare searchable domain string used for FAISS index filtering.',
+    inputs:['Retailer code (TY, NN_KSA, HB…)','Full URL (https://extra.com/p/123)','Plain domain (www.noon.com)','Empty string → no filter'],
+    code:`<span class="fn">resolve_target_domain</span>(<span class="str">"TY"</span>)
+  → <span class="str">"trendyol.com"</span>
+
+<span class="fn">resolve_target_domain</span>(<span class="str">"NN_KSA"</span>)
+  → <span class="str">"noon.com"</span>
+
+<span class="fn">resolve_target_domain</span>(<span class="str">"www.extra.com"</span>)
+  → <span class="str">"extra.com"</span>`,
+    outputs:['Bare domain string e.g. "trendyol.com"']
+  },
+  loaddata: {
+    icon:'📥', color:'var(--teal)', bg:'var(--teal-bg)',
+    title:'load_data()', type:'Data Loading · matcher.py',
+    desc:'Loads the Excel file with validation, fills missing links from human ground-truth column, extracts URL slug tokens as extra signal, and builds all enriched columns.',
+    inputs:['filepath — defaults to DEFAULT_DATA_PATH','Raises FileNotFoundError if missing','Raises ValueError if 0 valid rows'],
+    code:`<span class="kw">def</span> <span class="fn">load_data</span>(filepath=<span class="kw">None</span>):
+    df = pd.<span class="fn">read_excel</span>(filepath)
+    <span class="cm"># Fill from GT column "Unnamed: 8"</span>
+    df[<span class="str">"url_slug"</span>]       = df[<span class="str">"Link"</span>].<span class="fn">apply</span>(...)
+    df[<span class="str">"enriched_title"</span>] = df.<span class="fn">apply</span>(...)
+    df[<span class="str">"clean_title"</span>]    = ...<span class="fn">apply</span>(clean_text)
+    <span class="kw">return</span> df`,
+    outputs:['DataFrame + url_slug + enriched_title + clean_title']
+  },
+  clean: {
+    icon:'✨', color:'var(--teal)', bg:'var(--teal-bg)',
+    title:'clean_text()', type:'Text Processing · matcher.py',
+    desc:'Multilingual text normalizer. Safe for Arabic (preserves Unicode block U+0600–U+06FF), normalizes storage units, lowercases, removes punctuation.',
+    inputs:['Raw text string in any language'],
+    code:`<span class="kw">def</span> <span class="fn">clean_text</span>(text):
+    text = <span class="fn">str</span>(text).<span class="fn">lower</span>()
+    <span class="cm"># 256gb → "256 gb"</span>
+    text = re.<span class="fn">sub</span>(<span class="str">r'(\\d+)(gb|tb|mb)'</span>,
+                 <span class="str">r'\\1 \\2'</span>, text)
+    <span class="cm"># Keep Arabic \u0600-\u06FF</span>
+    text = re.<span class="fn">sub</span>(<span class="str">r'[^\\w\\s\\u0600-\\u06FF]'</span>,
+                 <span class="str">' '</span>, text)
+    <span class="kw">return</span> text.<span class="fn">strip</span>()`,
+    outputs:['Normalized string ready for SentenceTransformer']
+  },
+  compare: {
+    icon:'⚡', color:'var(--orange)', bg:'var(--orange-bg)',
+    title:'compare_two_products()', type:'Direct Compare · matcher.py',
+    desc:'Used in URL-to-URL comparison mode. Encodes both product titles independently and computes cosine similarity directly — no FAISS index needed.',
+    inputs:['title_a — source product title','title_b — target product title','model — loaded SentenceTransformer','threshold — default MATCH_THRESHOLD'],
+    code:`emb_a = model.<span class="fn">encode</span>([<span class="fn">clean_text</span>(title_a)])
+emb_b = model.<span class="fn">encode</span>([<span class="fn">clean_text</span>(title_b)])
+score = np.<span class="fn">dot</span>(emb_a[<span class="num">0</span>], emb_b[<span class="num">0</span>])
+
+<span class="cm"># Returns:</span>
+{ <span class="str">"score"</span>: <span class="num">0.9213</span>,
+  <span class="str">"is_match"</span>: <span class="kw">True</span>,
+  <span class="str">"elapsed"</span>: <span class="num">0.031</span> }`,
+    outputs:['{ score (float), is_match (bool), elapsed (s) }']
+  },
+  model: {
+    icon:'🤖', color:'var(--orange)', bg:'var(--orange-bg)',
+    title:'load_model()', type:'AI Model · matcher.py',
+    desc:'Loads the paraphrase-multilingual-MiniLM-L12-v2 model. Supports 50+ languages out of the box. Downloads ~120MB on first run, cached locally after. HF_TOKEN must be set in .env to avoid warnings.',
+    inputs:['model_name — HuggingFace model ID','cache_folder — local weights cache','HF_TOKEN set in .env (required)'],
+    code:`<span class="cm"># Model: paraphrase-multilingual-MiniLM-L12-v2</span>
+<span class="cm"># Dim:  384  |  Size: ~120MB cached</span>
+<span class="cm"># Languages: Arabic, English, Turkish + 47 more</span>
+
+model = <span class="fn">SentenceTransformer</span>(
+    <span class="str">"paraphrase-multilingual-MiniLM-L12-v2"</span>,
+    cache_folder=<span class="str">".model_cache"</span>
+)`,
+    outputs:['SentenceTransformer ready for .encode()']
+  },
+  index: {
+    icon:'🗂', color:'var(--orange)', bg:'var(--orange-bg)',
+    title:'build_index()', type:'Vector Index · FAISS · matcher.py',
+    desc:'Encodes all product clean_titles into 384-dimensional float32 embeddings and stores them in a FAISS IndexFlatIP. Uses L2-normalised inner product which equals cosine similarity.',
+    inputs:['df — DataFrame with clean_title column','model — loaded SentenceTransformer','show_progress — bool (True in notebook)'],
+    code:`embeddings = model.<span class="fn">encode</span>(
+    df[<span class="str">"clean_title"</span>].<span class="fn">tolist</span>(),
+    normalize_embeddings=<span class="kw">True</span>   <span class="cm">← L2 norm</span>
+)
+index = faiss.<span class="fn">IndexFlatIP</span>(dim=<span class="num">384</span>)
+index.<span class="fn">add</span>(embeddings)
+<span class="cm"># index.ntotal == len(df)</span>`,
+    outputs:['faiss.IndexFlatIP — call .search(vec, k)']
+  },
+  findmatch: {
+    icon:'🔬', color:'var(--orange)', bg:'var(--orange-bg)',
+    title:'find_match()', type:'Core Engine · matcher.py',
+    desc:'The heart of the system. Runs FAISS vector search, then applies 3-signal scoring to re-rank results. Supports domain filtering to restrict results to one specific retailer site.',
+    inputs:['query — product title (any language)','model, index, df','threshold — float (default 0.75)','target_filter — domain/code/URL (optional)'],
+    code:`<span class="cm"># Step 1: FAISS retrieves top-20 candidates</span>
+scores, ids = index.<span class="fn">search</span>(query_emb, <span class="num">20</span>)
+
+<span class="cm"># Step 2: 3-signal re-scoring</span>
+combined = semantic*<span class="num">0.60</span> + keyword*<span class="num">0.20</span> + model_boost
+
+<span class="cm"># Step 3: Sort → top-5 + Match Status label</span>`,
+    outputs:['DataFrame top-5 + Similarity Score + Match Status','attrs: domain_filtered (bool), domain_used (str)']
+  },
+  scoring: {
+    icon:'📐', color:'var(--amber)', bg:'var(--amber-bg)',
+    title:'3-Signal Scoring', type:'Scoring Logic · find_match() internals',
+    desc:'Three complementary signals each catch different failure modes. Pure semantic fails on product codes in different scripts. Keyword overlap catches exact token matches. Model number boost catches spec-identical products.',
+    inputs:['_semantic — FAISS cosine score (0–1)','_keyword — token overlap ratio (0–1)','_model — model# boost (0–0.20)'],
+    code:`score = (
+    semantic  * <span class="num">0.60</span>   <span class="cm">← main signal</span>
+  + keyword   * <span class="num">0.20</span>   <span class="cm">← exact tokens</span>
+  + model_num          <span class="cm">← ≤0.20 boost</span>
+)
+
+<span class="cm"># Short query boost (≤4 words):</span>
+score += keyword * <span class="num">0.10</span>
+
+<span class="cm"># Per model# match: +0.08, max 0.20</span>`,
+    outputs:['Combined similarity score 0.0 – 1.0']
+  },
+  threshold: {
+    icon:'⚖️', color:'var(--amber)', bg:'var(--amber-bg)',
+    title:'Threshold Check', type:'Decision Gate · find_match()',
+    desc:'Default threshold is 0.75. Adjustable via slider in both tabs. Lower values (0.65–0.70) are recommended for cross-language Arabic↔English matching where semantic scores are naturally lower.',
+    inputs:['combined score (float)','threshold (default 0.75)'],
+    code:`<span class="cm"># MATCH_THRESHOLD = 0.75 (default)</span>
+
+<span class="kw">if</span> score >= threshold:
+    status = <span class="str">"✅ Match Found"</span>
+<span class="kw">else</span>:
+    status = <span class="str">"❌ No Match"</span>
+
+<span class="cm"># Threshold guide:</span>
+<span class="cm"># 0.75 → strict    (EN ↔ EN)</span>
+<span class="cm"># 0.68 → balanced  (mixed langs)</span>
+<span class="cm"># 0.65 → lenient   (EN ↔ AR)</span>`,
+    outputs:['Match Found / No Match label on each result row']
+  },
+  runbatch: {
+    icon:'⚙️', color:'var(--teal)', bg:'var(--teal-bg)',
+    title:'run_batch()', type:'Batch Processor · matcher.py',
+    desc:'Processes every row in the uploaded DataFrame. Handles retailer code resolution, URL title auto-extraction, self-match exclusion, and per-row AHT timing with progress callback.',
+    inputs:['input_df — uploaded file as DataFrame','model, index, df','batch_threshold, global_target','progress_callback(current, total, msg)'],
+    code:`<span class="kw">for</span> i, row <span class="kw">in</span> input_df.<span class="fn">iterrows</span>():
+    domain  = <span class="fn">resolve_target_domain</span>(row.target)
+    <span class="kw">if not</span> title: <span class="cm"># auto-extract from URL</span>
+        title = <span class="fn">extract_title_from_url</span>(url)
+    t0 = time.<span class="fn">time</span>()
+    results = <span class="fn">find_match</span>(title, ...)
+    aht = time.<span class="fn">time</span>() - t0
+    <span class="cm"># exclude self-match · record AHT</span>`,
+    outputs:['Results DataFrame + AHT per row']
+  },
+  modelnums: {
+    icon:'🔢', color:'var(--amber)', bg:'var(--amber-bg)',
+    title:'extract_model_numbers()', type:'Signal 3 Helper · matcher.py',
+    desc:'Extracts product model codes and hardware specs from text using regex. These are high-value exact-match signals that semantic similarity misses when product names are in different languages.',
+    inputs:['text string — any language'],
+    code:`<span class="cm"># Catches alphanumeric codes:</span>
+<span class="str">"HP 2S9L1AA 256GB laptop"</span>
+ → { <span class="str">'2S9L1AA'</span>, <span class="str">'256GB'</span> }
+
+<span class="cm"># Pattern 1: model codes</span>
+<span class="str">r'\b[A-Z0-9]{2,}[-/]?[A-Z0-9]{2,}\b'</span>
+
+<span class="cm"># Pattern 2: specs</span>
+<span class="str">r'\b\d+\s?(?:GB|TB|MB|W|MP)\b'</span>`,
+    outputs:['set of model codes + specs (uppercase)']
+  },
+  aht: {
+    icon:'📈', color:'var(--rose)', bg:'var(--rose-bg)',
+    title:'AHT Dashboard', type:'Analytics · Tab 3 · streamlit_app.py',
+    desc:'Session-level Average Handling Time tracker. Shows per-search timing, trend line chart, and an AHT Reduction Calculator that compares AI speed against the manual annotation team baseline.',
+    inputs:['st.session_state.aht_log — list of elapsed times'],
+    code:`manual_aht = <span class="num">5</span> * <span class="num">60</span>  <span class="cm"># 5 min = 300s</span>
+ai_aht     = np.<span class="fn">mean</span>(aht_log)  <span class="cm"># ~0.3s</span>
+
+reduction = (manual - ai) / manual * <span class="num">100</span>
+<span class="cm"># → ~99.9% AHT reduction</span>
+
+<span class="cm"># Daily savings (100 products/day):</span>
+savings = (manual - ai) * <span class="num">100</span> / <span class="num">60</span>  <span class="cm"># mins</span>`,
+    outputs:['AHT reduction % · Daily savings (minutes) · Line chart']
+  },
+  save: {
+    icon:'💾', color:'var(--rose)', bg:'var(--rose-bg)',
+    title:'save_result_with_aht()', type:'Output · matcher.py',
+    desc:'Appends each single-search result to a persistent Excel log file. Creates the file on first run, appends on subsequent runs. Includes clickable hyperlinks and an AHT Summary sheet.',
+    inputs:['source_title, source_url','target_site, match_title, target_link','score (float), aht_seconds (float)','filepath (default: product_matching_results.xlsx)'],
+    code:`<span class="cm"># Appends to persistent log file</span>
+new_row = {
+    <span class="str">"Timestamp"</span>:       datetime.<span class="fn">now</span>(),
+    <span class="str">"Source Product"</span>:  source_title,
+    <span class="str">"Similarity Score"</span>: <span class="fn">round</span>(score, <span class="num">4</span>),
+    <span class="str">"Match Status"</span>:    status,
+    <span class="str">"AHT (seconds)"</span>:   aht_seconds,
+}`,
+    outputs:['product_matching_results.xlsx with 2 sheets']
+  },
+  batchxl: {
+    icon:'📤', color:'var(--rose)', bg:'var(--rose-bg)',
+    title:'generate_batch_excel()', type:'Excel Export · matcher.py',
+    desc:'Generates a professional Excel workbook from batch results as bytes. Includes clickable links, color-coded match status, alternating row stripes, and a Summary analytics sheet.',
+    inputs:['result_df — batch results DataFrame'],
+    code:`<span class="cm"># Sheet 1: "Batch Results"</span>
+<span class="cm">#   Clickable Source URL + Target Link</span>
+<span class="cm">#   Green row  → Match Found</span>
+<span class="cm">#   Red row    → No Match</span>
+<span class="cm">#   Alternating stripe rows</span>
+
+<span class="cm"># Sheet 2: "Summary"</span>
+<span class="cm">#   Total / Matched / Match Rate</span>
+<span class="cm">#   Avg AHT / Total Processing Time</span>`,
+    outputs:['bytes → st.download_button(data=...) or open()']
+  },
+  structure: {
+    icon:'🗂', color:'var(--blue)', bg:'var(--blue-bg)',
+    title:'Project Structure', type:'File System · Project Root',
+    desc:'Clean modular separation of UI and logic. utils/matcher.py is the single reusable core — importable by both Streamlit and Jupyter without modification.',
+    inputs:[],
+    code:`product_matching_system_Basemodel/
+├── app/
+│   └── <span class="fn">streamlit_app.py</span>  <span class="cm">← UI only</span>
+├── utils/
+│   ├── __init__.py
+│   └── <span class="fn">matcher.py</span>       <span class="cm">← all logic</span>
+├── data/
+│   ├── Matching List - Example 1.xlsx
+│   └── Matching List - Example 2.xlsx
+├── <span class="fn">experiments.ipynb</span>     <span class="cm">← backend tests</span>
+├── .env                  <span class="cm">← HF_TOKEN</span>
+└── requirements.txt`,
+    outputs:['Shared by streamlit_app.py + experiments.ipynb']
+  },
+};
+
+// ── Arrow definitions ─────────────────────────────────────────────────────────
+const ARROWS = [
+  // Inputs → Data pipeline
+  ['n-single',   'n-scraper',   'violet', false],
+  ['n-single',   'n-domain',    'violet', false],
+  ['n-batch',    'n-domain',    'violet', false],
+  ['n-batch',    'n-runbatch',  'violet', false],
+  ['n-excel',    'n-loaddata',  'blue',   false],
+  ['n-notebook', 'n-loaddata',  'blue',   true],
+  ['n-notebook', 'n-findmatch', 'blue',   true],
+
+  // Data pipeline → AI core
+  ['n-scraper',  'n-compare',   'teal',   false],
+  ['n-scraper',  'n-findmatch', 'teal',   false],
+  ['n-domain',   'n-findmatch', 'teal',   false],
+  ['n-loaddata', 'n-clean',     'teal',   false],
+  ['n-loaddata', 'n-model',     'teal',   false],
+  ['n-clean',    'n-index',     'teal',   false],
+
+  // AI core internal
+  ['n-model',    'n-compare',   'orange', false],
+  ['n-model',    'n-index',     'orange', false],
+  ['n-model',    'n-findmatch', 'orange', false],
+  ['n-index',    'n-findmatch', 'orange', false],
+
+  // AI → Logic
+  ['n-findmatch','n-scoring',   'orange', false],
+  ['n-findmatch','n-runbatch',  'orange', true],
+  ['n-scoring',  'n-threshold', 'amber',  false],
+  ['n-modelnums','n-scoring',   'amber',  true],
+
+  // Logic → Output
+  ['n-threshold','n-aht',       'rose',   false],
+  ['n-threshold','n-save',      'rose',   false],
+  ['n-runbatch', 'n-batchxl',   'rose',   false],
+  ['n-compare',  'n-aht',       'orange', true],
+];
+
+function rect(id) {
+  const el = document.getElementById(id);
+  const cw = document.getElementById('canvas');
+  const cr = cw.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  return {
+    l: er.left - cr.left, r: er.right  - cr.left,
+    t: er.top  - cr.top,  b: er.bottom - cr.top,
+    mx: er.left - cr.left + er.width  / 2,
+    my: er.top  - cr.top  + er.height / 2,
+    w: er.width, h: er.height,
+  };
+}
+
+const CLRS = {
+  violet: '#b8b0fa', teal: '#7dd6cc',
+  orange: '#f5b98a', amber: '#f5d07a',
+  rose:   '#f4a8c8', blue:  '#90b8fa',
+};
+
+function drawAllArrows() {
+  const svg = document.getElementById('arrows');
+  // Clear all paths but keep defs
+  const defs = svg.querySelector('defs');
+  while (svg.lastChild !== defs) svg.removeChild(svg.lastChild);
+
+  ARROWS.forEach(([from, to, clr, dashed]) => {
+    try {
+      const a = rect(from), b = rect(to);
+      let x1, y1, x2, y2;
+      const dx = b.mx - a.mx, dy = b.my - a.my;
+
+      if (Math.abs(dx) >= Math.abs(dy) * 0.8) {
+        // horizontal dominant
+        if (a.mx < b.mx) { x1 = a.r; x2 = b.l; }
+        else              { x1 = a.l; x2 = b.r; }
+        y1 = a.my; y2 = b.my;
+      } else {
+        // vertical dominant
+        if (a.my < b.my) { y1 = a.b; y2 = b.t; }
+        else             { y1 = a.t; y2 = b.b; }
+        x1 = a.mx; x2 = b.mx;
+      }
+
+      const cdx = (x2 - x1), cdy = (y2 - y1);
+      const cp1x = x1 + cdx * 0.45, cp1y = y1;
+      const cp2x = x2 - cdx * 0.45, cp2y = y2;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M${x1},${y1} C${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`);
+      path.setAttribute('stroke', CLRS[clr]);
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('marker-end', `url(#ah-${clr})`);
+      path.setAttribute('opacity', '0.75');
+      if (dashed) path.setAttribute('stroke-dasharray', '7,4');
+      svg.appendChild(path);
+    } catch(e) {}
+  });
+}
+
+// ── Panel ─────────────────────────────────────────────────────────────────────
+function showPanel(key) {
+  const d = DATA[key];
+  if (!d) return;
+  document.getElementById('panel-body').innerHTML = `
+    <div class="panel-icon-row">
+      <div class="panel-icon" style="background:${d.bg}">${d.icon}</div>
+      <div>
+        <div class="panel-title">${d.title}</div>
+        <div class="panel-type">${d.type}</div>
+      </div>
+    </div>
+    <div class="panel-desc">${d.desc}</div>
+    ${d.inputs?.length ? `
+    <div class="panel-sec-title">Inputs</div>
+    <div class="pills">${d.inputs.map(i=>`<div class="pill">${i}</div>`).join('')}</div>` : ''}
+    <div class="panel-sec-title">Code</div>
+    <div class="code-box"><pre>${d.code}</pre></div>
+    ${d.outputs?.length ? `
+    <div class="panel-sec-title">Returns / Outputs</div>
+    <div class="pills">${d.outputs.map(o=>`<div class="pill" style="border-color:${d.color};color:${d.color}">${o}</div>`).join('')}</div>` : ''}
+  `;
+  document.getElementById('panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+}
+
+window.addEventListener('load', () => setTimeout(drawAllArrows, 120));
+window.addEventListener('resize', drawAllArrows);
+</script>
+</body>
+</html>
