@@ -1,10 +1,11 @@
+streamlit
 pandas
 numpy
 sentence-transformers
-faiss-cpu
+faiss-cpu==1.7.4
 scikit-learn
-streamlit
 rapidfuzz
 openpyxl
+beautifulsoup4
+altair
 ipykernel
- beautifulsoup4
