@@ -1,63 +1,37 @@
-# -----------------------------
-# Python cache files
-# -----------------------------
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# -----------------------------
 # Virtual environments
-# -----------------------------
 product_matching_venv/
 venv/
 env/
 .venv/
 
-# -----------------------------
-# Model cache (HuggingFace / SentenceTransformers)
-# -----------------------------
+# Model cache
 .model_cache/
-app/.model_cache/
 cache/
 models/
 
-# -----------------------------
 # Environment variables
-# -----------------------------
 .env
 .env.*
 
-# -----------------------------
-# Jupyter Notebook
-# -----------------------------
+# Jupyter
 .ipynb_checkpoints/
 
-# -----------------------------
-# Streamlit cache
-# -----------------------------
-.streamlit/
+# Streamlit secrets only
+.streamlit/secrets.toml
 
-# -----------------------------
 # Logs
-# -----------------------------
 *.log
 
-# -----------------------------
 # OS files
-# -----------------------------
 .DS_Store
 Thumbs.db
 
-# -----------------------------
-# Large datasets (optional)
-# -----------------------------
-*.csv
-*.xlsx
-*.parquet
-
-# -----------------------------
-# IDE settings
-# -----------------------------
+# IDE
 .vscode/
 .idea/
