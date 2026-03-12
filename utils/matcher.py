@@ -59,7 +59,23 @@ warnings.filterwarnings("ignore")
 # ── Heavy imports AFTER token is set ─────────────────────────────────────────
 import numpy as np
 import pandas as pd
-import faiss
+
+# ── FAISS: resilient import for Streamlit Cloud ───────────────────────────────
+# faiss-cpu requires AVX2 on newer versions; 1.7.4 is the last non-AVX2 build.
+# This try/except gives a clear actionable error instead of a cryptic crash.
+try:
+    import faiss
+    _FAISS_OK = True
+except (ImportError, Exception) as _faiss_err:
+    faiss = None
+    _FAISS_OK = False
+    import logging as _log
+    _log.warning(
+        f"faiss import failed: {_faiss_err}\n"
+        "Falling back to pure-numpy cosine search (slower but functional).\n"
+        "Fix: pin faiss-cpu==1.7.4 and numpy==1.26.4 in requirements.txt"
+    )
+
 import requests
 from bs4 import BeautifulSoup
 import openpyxl
@@ -323,16 +339,39 @@ def load_model(
 # FAISS INDEX
 # ─────────────────────────────────────────────────────────────────────────────
 
+class _NumpyIndex:
+    """
+    Pure-numpy fallback when faiss is unavailable (e.g. Streamlit Cloud without AVX2).
+    Stores L2-normalised embeddings; returns cosine similarity via matrix multiply.
+    API matches faiss.IndexFlatIP: .search(query, k) returns (scores, ids).
+    """
+    def __init__(self, embeddings: np.ndarray):
+        self.vectors = embeddings
+        self.ntotal  = embeddings.shape[0]
+        self.d       = embeddings.shape[1]
+
+    def search(self, query: np.ndarray, k: int):
+        scores_1d  = (self.vectors @ query[0]).astype("float32")
+        k_actual   = min(k, self.ntotal)
+        top_ids    = np.argsort(-scores_1d)[:k_actual]
+        top_scores = scores_1d[top_ids]
+        return top_scores[np.newaxis, :], top_ids[np.newaxis, :]
+
+    def add(self, _):
+        pass
+
+
 def build_index(
     df: pd.DataFrame,
     model: SentenceTransformer,
     show_progress: bool = True,
-) -> faiss.IndexFlatIP:
+):
     """
-    Build a FAISS inner-product index over all products in df.
+    Build a similarity search index over all products in df.
 
-    Uses cosine similarity via L2-normalised vectors + inner product,
-    which gives identical results to cosine but runs faster in FAISS.
+    Prefers FAISS (fast C++ BLAS-backed cosine search) when available.
+    Falls back to pure-numpy when FAISS cannot load (e.g. Streamlit Cloud
+    servers without AVX2 CPU support). Both return identical match results.
 
     Args:
         df:            DataFrame with a 'clean_title' column (from load_data)
@@ -340,11 +379,7 @@ def build_index(
         show_progress: Show tqdm progress bar (True in notebook, False in app)
 
     Returns:
-        faiss.IndexFlatIP — call index.search(query_vec, k) to retrieve top-k
-
-    Example (notebook):
-        index = build_index(df, model)
-        print(f"Index has {index.ntotal} vectors, dim={index.d}")
+        faiss.IndexFlatIP or _NumpyIndex — both support .search(query, k)
     """
     if "clean_title" not in df.columns:
         raise ValueError(
@@ -358,8 +393,13 @@ def build_index(
         show_progress_bar=show_progress,
     )
     embeddings = np.array(embeddings, dtype="float32")
-    index      = faiss.IndexFlatIP(embeddings.shape[1])
-    index.add(embeddings)
+
+    if _FAISS_OK:
+        index = faiss.IndexFlatIP(embeddings.shape[1])
+        index.add(embeddings)
+    else:
+        index = _NumpyIndex(embeddings)
+
     return index
 
 
@@ -438,7 +478,7 @@ def extract_model_numbers(text: str) -> set:
 def find_match(
     query: str,
     model: SentenceTransformer,
-    index: faiss.IndexFlatIP,
+    index,  # faiss.IndexFlatIP or _NumpyIndex
     df: pd.DataFrame,
     threshold: float = MATCH_THRESHOLD,
     target_filter: str = None,
@@ -513,8 +553,11 @@ def find_match(
             normalize_embeddings=True,
             show_progress_bar=False,
         ).astype("float32")
-        sub_idx = faiss.IndexFlatIP(sub_emb.shape[1])
-        sub_idx.add(sub_emb)
+        if _FAISS_OK:
+            sub_idx = faiss.IndexFlatIP(sub_emb.shape[1])
+            sub_idx.add(sub_emb)
+        else:
+            sub_idx = _NumpyIndex(sub_emb)
         top_k        = min(20, len(search_df))
         scores, ids  = sub_idx.search(query_embedding, top_k)
         results      = search_df.iloc[ids[0]].copy()
@@ -701,7 +744,7 @@ def extract_title_from_url(url: str) -> dict:
 def run_batch(
     input_df: pd.DataFrame,
     model: SentenceTransformer,
-    index: faiss.IndexFlatIP,
+    index,  # faiss.IndexFlatIP or _NumpyIndex
     df: pd.DataFrame,
     batch_threshold: float = MATCH_THRESHOLD,
     global_target: str = "",

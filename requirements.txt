@@ -1,10 +1,30 @@
-streamlit
-pandas
-numpy
-sentence-transformers
-faiss-cpu==1.7.3
-scikit-learn
-rapidfuzz
-openpyxl
-beautifulsoup4
-altair
+# ── Pinned for Streamlit Cloud compatibility ──────────────────────────────────
+# numpy MUST be pinned — numpy 2.x broke faiss and many other packages
+numpy==1.26.4
+
+# faiss-cpu 1.7.4 is the last version that works without AVX2
+# Streamlit Cloud uses standard Linux VMs that may not have AVX2
+faiss-cpu==1.7.4
+
+# Core data + ML
+pandas==2.2.2
+scikit-learn==1.4.2
+
+# AI model — sentence-transformers 2.x is stable
+sentence-transformers==2.7.0
+
+# Web app
+streamlit==1.35.0
+
+# Excel I/O
+openpyxl==3.1.2
+
+# String matching
+rapidfuzz==3.9.3
+
+# Web scraping
+requests==2.32.3
+beautifulsoup4==4.12.3
+
+# Env loading (local dev only — Streamlit Cloud uses Secrets)
+python-dotenv==1.0.1
