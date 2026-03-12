@@ -2,7 +2,7 @@ streamlit
 pandas
 numpy
 sentence-transformers
-faiss-cpu==1.7.4
+faiss-cpu==1.7.3
 scikit-learn
 rapidfuzz
 openpyxl
